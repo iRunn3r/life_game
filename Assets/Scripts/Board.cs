@@ -1,24 +1,61 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Game
 {
     [Serializable]
-    internal class Board
+    internal class Board : MonoBehaviour
     {
-        internal bool[,] Cells { get; set; }
-        internal int Width { get; set; }
-        internal int Height { get; set; }
+        internal Cell[,] Cells { get; set; }
+        public int Width { get; set; }
+        public int Height { get; set; }
 
+        private static GameObject deadPrefab;
+        private static GameObject alivePrefab;
+
+        internal struct Cell
+        {
+            internal bool State { get; set; }
+            internal int X { get; set; }
+            internal int Y { get; set; }
+            internal GameObject Tile;
+
+            internal Cell(int x, int y, bool state)
+            {
+                State = state;
+                X = x;
+                Y = y;
+                Tile = Instantiate(deadPrefab, new Vector3(x, y), Quaternion.identity);
+            }
+        }
+        
         internal Board(int width, int height)
         {
+            Initialize(width, height);
+        }
+        
+        internal void Initialize(int width, int height)
+        {
+            deadPrefab = Resources.Load("DeadCell") as GameObject;
+            alivePrefab = Resources.Load("AliveCell") as GameObject;
+
             Width = width;
             Height = height;
-            Cells = new bool[width, height];
-        }
+            Cells = new Cell[width, height];
 
-        internal void Update()
+            for (var x = 0; x < Width; x++)
+            {
+                for (var y = 0; y < Height; y++)
+                {
+                    Cells[x, y] = new Cell(x, y, false);
+                }
+            }
+        }
+        
+        internal void UpdateCells()
         {
+            var changedCells = new List<(int X, int Y, bool Value)>();
             for (var x = 0; x < Width; x++)
             {
                 for (var y = 0; y < Height; y++)
@@ -27,14 +64,21 @@ namespace Game
                     if (GetCell(x, y) == false)
                     {
                         if (neighborCount == 3)
-                            SetCell(x, y, true);
+                        {
+                            changedCells.Add((x, y, true));
+                        }  
                     }
                     else
                     {
                         if (neighborCount < 2 || neighborCount > 3)
-                            SetCell(x, y, false);
+                            changedCells.Add((x, y, false));
                     }
                 }
+            }
+
+            for (var i = 0; i < changedCells.Count; i++)
+            {
+                SetCell(changedCells[i].X, changedCells[i].Y, changedCells[i].Value);
             }
         }
 
@@ -43,7 +87,17 @@ namespace Game
             if (x < 0 || x >= Width || y < 0 || y >= Height)
                 throw new ArgumentOutOfRangeException($"The cell position {x}:{y} is out of the bounds of the board!");
 
-            Cells[x, y] = value;
+            SetPrefab(x, y, value);
+            Cells[x, y].State = value;
+        }
+
+        private void SetPrefab(int x, int y, bool alive)
+        {
+            if (alive == Cells[x, y].State)
+                return;
+            
+            DestroyImmediate(Cells[x, y].Tile);
+            Cells[x, y].Tile = Instantiate(alive ? alivePrefab : deadPrefab, new Vector3(x, y), Quaternion.identity);
         }
 
         internal bool GetCell(int x, int y)
@@ -51,7 +105,7 @@ namespace Game
             if (x < 0 || x >= Width || y < 0 || y >= Height)
                 throw new ArgumentOutOfRangeException($"The cell position {x}:{y} is out of the bounds of the board!");
 
-            return Cells[x, y];
+            return Cells[x, y].State;
         }
 
         private int CountNeighbors(int x, int y)
@@ -61,8 +115,6 @@ namespace Game
             {
                 for (var j = y - 1; j <= y + 1; j++)
                 {
-                    if (((i == 3 && j == 4) || (i == 4 && j == 4) || (i == 5 && j == 4)) && x == 4 && y == 3)
-                        Debug.Log($"GetCell({i}, {j}): {GetCell(i, j)}");
                     if (i >= 0 && i < Width && j >= 0 && j < Height && (i != x || j != y) && GetCell(i, j) == true)
                         neighborCount++;
                 }
@@ -79,15 +131,15 @@ namespace Game
                 return;
             }
 
-            var dead = "X";
-            var alive = "O";
-
+            const string dead = "X";
+            const string alive = "O";
+            
             var message = string.Empty;
-            for (int y = Height - 1; y >= 0; y--)
+            for (var y = Height - 1; y >= 0; y--)
             {
-                for (int x = 0; x < Width; x++)
+                for (var x = 0; x < Width; x++)
                 {
-                    message += Cells[x, y] == true ? alive : dead;
+                    message += Cells[x, y].State ? alive : dead;
                 }
                 message += "\n";
             }
