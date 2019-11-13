@@ -8,6 +8,7 @@ public class ManagerScript : MonoBehaviour
     
     private void Start()
     {
+        Application.targetFrameRate = 60;
         board = gameObject.AddComponent(typeof(Board)) as Board;
         if (board == null)
             return;
